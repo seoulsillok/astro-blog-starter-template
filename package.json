@@ -13,12 +13,19 @@
 		"publish": true
 	},
 	"dependencies": {
+		"@astrojs/check": "^0.9.6",
 		"@astrojs/cloudflare": "12.6.0",
 		"@astrojs/mdx": "4.3.0",
 		"@astrojs/rss": "4.0.11",
 		"@astrojs/sitemap": "3.4.1",
+		"@tailwindcss/vite": "^4.1.17",
+		"@types/d3": "^7.4.3",
+		"@types/topojson-client": "^3.1.5",
 		"astro": "5.10.1",
-		"typescript": "5.8.3"
+		"d3": "^7.9.0",
+		"tailwindcss": "^4.1.17",
+		"topojson-client": "^3.1.0",
+		"typescript": "^5.8.3"
 	},
 	"devDependencies": {
 		"wrangler": "4.21.x"

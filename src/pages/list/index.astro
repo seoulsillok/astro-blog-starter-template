@@ -1,0 +1,112 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { processSeoulData } from '../../utils/geoUtils';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+// Load data at build time
+const dataPath = path.join(process.cwd(), 'public/data/seoul_submunicipalities_topo_simple.json');
+const fileContent = await fs.readFile(dataPath, 'utf-8');
+const topology = JSON.parse(fileContent);
+const geojson = processSeoulData(topology);
+
+// Extract merged features
+const features = geojson.features.map(f => f.properties);
+
+// Load Gu names? We can map guCode to a name.
+// Since we don't have a direct mapping file handy, we can try to infer or use a static mapping.
+// But wait, the features just have guCode.
+// The user might want to see "Gangnam-gu", etc.
+// I'll try to load the municipalities file to get the Gu names mapping.
+
+const guDataPath = path.join(process.cwd(), 'public/data/seoul_municipalities_topo_simple.json');
+let guNameMap = new Map<string, string>();
+
+try {
+  const guFileContent = await fs.readFile(guDataPath, 'utf-8');
+  const guTopology = JSON.parse(guFileContent);
+  // Municipality features usually have properties like code and name.
+  // Let's inspect the structure if we can, but I'll assume standard properties.
+  // Actually, I can use the same utility if I adapt it, or just parse it here.
+
+  // Need to import topojson-client here too or dynamic import?
+  // I can just rely on the fact that I know how to parse it.
+  // It's a Topology. objects.seoul_municipalities_geo.geometries...
+
+  const guGeometries = guTopology.objects.seoul_municipalities_geo.geometries;
+  guGeometries.forEach((geo: any) => {
+    // Gu codes are 5 digits usually? Or same format.
+    // Let's assume property "code" and "name".
+    guNameMap.set(geo.properties.code, geo.properties.name);
+  });
+} catch (e) {
+  console.error("Failed to load Gu data", e);
+}
+
+// Group dongs by Gu
+const dongsByGu = new Map<string, string[]>();
+
+features.forEach(f => {
+  const guName = guNameMap.get(f.guCode) || `District ${f.guCode}`;
+  if (!dongsByGu.has(guName)) {
+    dongsByGu.set(guName, []);
+  }
+  dongsByGu.get(guName)!.push(f.name);
+});
+
+// Sort
+const sortedGuNames = Array.from(dongsByGu.keys()).sort();
+sortedGuNames.forEach(gu => {
+  dongsByGu.get(gu)!.sort();
+});
+
+const allDongs = features.map(f => f.name).sort();
+
+---
+
+<Layout title="All Neighborhoods - Seoul Map">
+  <main class="min-h-screen bg-neutral-50 p-8">
+    <div class="max-w-4xl mx-auto">
+      <nav class="mb-8">
+        <a href="/" class="text-lg font-bold hover:underline">← Back to Map</a>
+      </nav>
+
+      <h1 class="text-4xl font-black mb-12 text-center">All Neighborhoods</h1>
+
+      <div class="grid md:grid-cols-2 gap-12">
+        <div>
+          <h2 class="text-2xl font-bold mb-6 border-b pb-2">By District (Gu)</h2>
+          <div class="space-y-8">
+            {sortedGuNames.map(gu => (
+              <div>
+                <h3 class="text-xl font-bold mb-3 text-gray-800">{gu}</h3>
+                <ul class="grid grid-cols-2 gap-2">
+                  {dongsByGu.get(gu)!.map(dong => (
+                    <li>
+                      <a href={`/dong/${dong}`} class="text-gray-600 hover:text-black hover:underline decoration-1 underline-offset-2">
+                        {dong}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-2xl font-bold mb-6 border-b pb-2">Alphabetical</h2>
+          <ul class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {allDongs.map(dong => (
+              <li>
+                <a href={`/dong/${dong}`} class="text-gray-600 hover:text-black hover:underline decoration-1 underline-offset-2">
+                  {dong}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
