@@ -1,0 +1,73 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { processSeoulData } from '../../utils/geoUtils';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+export async function getStaticPaths() {
+  // We need to generate paths for all merged dongs.
+  // We can load the TopoJSON file during build.
+  // Note: In Astro SSR, this might be different, but for static site generation (default), this works.
+
+  const dataPath = path.join(process.cwd(), 'public/data/seoul_submunicipalities_topo_simple.json');
+  const fileContent = await fs.readFile(dataPath, 'utf-8');
+  const topology = JSON.parse(fileContent);
+  const geojson = processSeoulData(topology);
+
+  // Extract unique names
+  const uniqueNames = Array.from(new Set(geojson.features.map(f => f.properties.name)));
+
+  return uniqueNames.map(name => ({
+    params: { name },
+    props: { name }
+  }));
+}
+
+const { name } = Astro.props;
+
+// Mock Instagram Data (In a real app, this would come from a database or CMS)
+const INSTAGRAM_POSTS = {
+  // Add some dummy data or logic to generate dummy IDs
+  "default": "https://www.instagram.com/p/C-example"
+};
+
+// Generate a dummy embed code or use a placeholder
+const instagramEmbedUrl = INSTAGRAM_POSTS[name] || "";
+
+---
+
+<Layout title={`${name} - Seoul Map`}>
+  <main class="min-h-screen bg-neutral-50 p-8 flex flex-col items-center">
+    <div class="max-w-4xl w-full">
+      <nav class="mb-8 flex justify-between items-center">
+        <a href="/" class="text-lg font-bold hover:underline">← Back to Map</a>
+        <a href="/about" class="text-sm text-gray-500 hover:text-black">About</a>
+      </nav>
+
+      <h1 class="text-5xl font-black mb-12 text-center tracking-tight">{name}</h1>
+
+      <div class="bg-white p-4 shadow-sm border border-gray-200 rounded-lg min-h-[400px] flex items-center justify-center mb-12">
+        {instagramEmbedUrl ? (
+          <div class="w-full flex justify-center">
+             <!-- Instagram Embed Placeholder -->
+             <blockquote class="instagram-media" data-instgrm-permalink={instagramEmbedUrl} data-instgrm-version="14" style=" background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);">
+             </blockquote>
+             <script async src="//www.instagram.com/embed.js"></script>
+          </div>
+        ) : (
+          <div class="text-gray-400 text-center">
+            <p class="text-xl mb-2">No post yet for {name}</p>
+            <p class="text-sm">Explore other neighborhoods!</p>
+          </div>
+        )}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+         <div class="border-t pt-4">
+            <h2 class="text-xl font-bold mb-4">Explore More</h2>
+             <a href="/list" class="text-blue-600 hover:underline">View All Neighborhoods Categorized by District</a>
+         </div>
+      </div>
+    </div>
+  </main>
+</Layout>

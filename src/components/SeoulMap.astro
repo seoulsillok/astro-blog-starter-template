@@ -1,0 +1,109 @@
+---
+import { processSeoulData } from '../utils/geoUtils';
+import type { SeoulTopology } from '../utils/geoUtils'; // We might need to export this type or redefine it
+
+interface Props {}
+---
+
+<div id="map-container" class="w-full h-screen bg-[#f0f0f0] flex items-center justify-center relative overflow-hidden">
+  <div id="loading" class="absolute text-xl font-bold text-gray-500">Loading Map...</div>
+  <svg id="seoul-map" class="w-full h-full max-w-5xl max-h-screen"></svg>
+  <div id="tooltip" class="absolute hidden pointer-events-none bg-white/90 px-3 py-1 rounded shadow-lg text-sm font-bold border border-gray-200 z-10 transform -translate-x-1/2 -translate-y-full mt-[-10px]"></div>
+</div>
+
+<script>
+  import * as d3 from 'd3';
+  import { processSeoulData } from '../utils/geoUtils';
+
+  async function initMap() {
+    const container = document.getElementById('map-container');
+    const loading = document.getElementById('loading');
+    const svg = d3.select('#seoul-map');
+    const tooltip = d3.select('#tooltip');
+
+    try {
+      const response = await fetch('/data/seoul_submunicipalities_topo_simple.json');
+      if (!response.ok) throw new Error('Failed to load map data');
+      const topology = await response.json();
+
+      loading.style.display = 'none';
+
+      const geojson = processSeoulData(topology);
+
+      // Gu Color Scale
+      // We generate colors based on guCode.
+      const guCodes = Array.from(new Set(geojson.features.map(f => f.properties.guCode)));
+      const colorScale = d3.scaleOrdinal()
+        .domain(guCodes)
+        .range(d3.schemePastel1.concat(d3.schemeSet3)); // Use a nice palette
+
+      // Projection
+      // Seoul coordinates are approx 127E, 37.5N.
+      // We use a Mercator projection centered on Seoul.
+      // But we need to fit the features to the SVG.
+
+      const updateDimensions = () => {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+
+        svg.attr('width', width).attr('height', height);
+
+        const projection = d3.geoMercator()
+          .fitSize([width, height], geojson);
+
+        const path = d3.geoPath().projection(projection);
+
+        // Render Features
+        svg.selectAll('path')
+          .data(geojson.features)
+          .join('path')
+          .attr('d', path)
+          .attr('fill', d => colorScale(d.properties.guCode))
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 0.5)
+          .attr('class', 'transition-all duration-200 cursor-pointer hover:opacity-80')
+          .on('mouseover', function(event, d) {
+            d3.select(this)
+              .attr('stroke', '#333')
+              .attr('stroke-width', 2)
+              .raise(); // Bring to front
+
+            tooltip
+              .style('display', 'block')
+              .text(d.properties.name)
+              .style('left', (event.pageX + 10) + 'px')
+              .style('top', (event.pageY - 10) + 'px');
+          })
+          .on('mousemove', function(event) {
+            const [x, y] = d3.pointer(event, container);
+            tooltip
+              .style('left', x + 'px')
+              .style('top', y + 'px');
+          })
+          .on('mouseout', function() {
+            d3.select(this)
+              .attr('stroke', '#fff')
+              .attr('stroke-width', 0.5);
+
+            tooltip.style('display', 'none');
+          })
+          .on('click', function(event, d) {
+             window.location.href = `/dong/${d.properties.name}`;
+          });
+      };
+
+      updateDimensions();
+      window.addEventListener('resize', updateDimensions);
+
+    } catch (error) {
+      console.error(error);
+      loading.textContent = 'Error loading map.';
+    }
+  }
+
+  initMap();
+</script>
+
+<style>
+  /* Add any additional styles here */
+</style>
